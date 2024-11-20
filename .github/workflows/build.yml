@@ -1,0 +1,120 @@
+name: Spidermonkey
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - "main"
+    tags:
+      - v*
+  pull_request:
+
+env:
+  SHELL: /bin/bash
+  # ccache
+  CCACHE: ccache
+  # use clang/lld
+  CXX: clang++
+  CC: clang
+  LDFLAGS: -fuse-ld=lld
+  LD_LIBRARY_PATH: /usr/local/lib
+
+jobs:
+  build-x86_64-unknown-linux-gnu:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install deps
+        run: |
+          sudo apt install ccache llvm clang lld meson ninja-build -y
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Get SM pkg
+        run: ./tools/get_sm.sh
+      - name: ccache cache files
+        uses: actions/cache@v1.1.0
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-${{ hashFiles('**/mozjs.tar.xz') }}
+      - name: Build SpiderMonkey
+        run: |
+          cargo install cbindgen --force
+
+          mkdir -p /tmp/mozjs
+          tar -xf mozjs.tar.xz -C /tmp/mozjs
+          cd /tmp/mozjs
+          cd $(ls -d */|head -n 1)
+          cd js/src
+          bash $GITHUB_WORKSPACE/tools/generic_lib.sh $GITHUB_WORKSPACE/meson.build
+          mkdir _build
+          cd _build
+          # ../configure --disable-jemalloc --with-system-zlib --with-intl-api --enable-debug --enable-optimize
+          # ../configure --with-system-zlib --with-intl-api --enable-optimize --disable-debug
+          ../configure --enable-optimize --disable-debug
+          ccache -z
+          make
+          sudo make install
+          ccache -s
+
+          cd ..
+          cp -r ./_build/dist/bin /tmp/mozjz_build
+
+          sudo apt install tree -y
+
+          cd /tmp/mozjz_build
+
+          tree -hs > ~/tree.txt
+
+          # rm -rf /tmp/mozjz_build/x86_64-unknown-linux-gnu
+          # rm -rf /tmp/mozjz_build/debug
+          rm -rf /tmp/mozjz_build/Test*
+          rm -rf /tmp/mozjz_build/*.py
+          rm -rf /tmp/mozjz_build/*-tests
+          rm -rf /tmp/mozjz_build/nsinstall
+
+
+          cd ~
+          tar -czf ~/spidermonkey-x86_64-unknown-linux-gnu.tar.gz -C /tmp/mozjz_build .
+      # - name: Upload Build Artifacts
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: tree
+      #     path: ~/tree.txt
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: spidermonkey-x86_64-unknown-linux-gnu
+          path: ~/spidermonkey-x86_64-unknown-linux-gnu.tar.gz
+
+  build:
+    needs: [
+        "build-x86_64-unknown-linux-gnu",
+        # "build-windows",
+        # "build-macos-x86_64",
+        # "build-macos-aarch64",
+      ]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: sleep
+        run: |
+          sleep 3m
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: spidermonkey
+          pattern: spidermonkey-*
+          merge-multiple: true
+
+      - name: release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "git /*.tar.gz"
