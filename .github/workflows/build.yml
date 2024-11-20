@@ -34,7 +34,7 @@ jobs:
         with:
           toolchain: stable
       - name: Get SM pkg
-        run: ./tools/get_sm.sh
+        run: bash ./tools/get_sm.sh
       - name: ccache cache files
         uses: actions/cache@v1.1.0
         with:
