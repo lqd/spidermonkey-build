@@ -117,4 +117,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "spidermonkey/*.tar.gz,dist-manifest.json"
+          artifacts: "spidermonkey/*.tar.xz,dist-manifest.json"
