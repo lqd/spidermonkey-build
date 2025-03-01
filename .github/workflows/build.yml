@@ -75,7 +75,7 @@ jobs:
           rm -rf /tmp/mozjz_build/*.py
           rm -rf /tmp/mozjz_build/*-tests
           rm -rf /tmp/mozjz_build/nsinstall
-          rm -rf /tmp/mozjz_build/.*
+          # rm -rf /tmp/mozjz_build/.*
 
 
           cd ~
